@@ -875,14 +875,35 @@ export default function App() {
       
       let stream = streamRef.current;
       if (!stream) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setStatus('Camera Unsupported');
+          setErrorMsg('Media devices API is not supported in this browser or context.');
+          return;
+        }
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-              width: { ideal: 1280 }, 
-              height: { ideal: 720 },
-              facingMode: 'user'
-            } 
-          });
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+              video: { 
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 },
+                facingMode: 'user'
+              } 
+            });
+          } catch (firstErr: any) {
+            console.warn("Ideal camera constraints failed, trying simpler constraints:", firstErr);
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                  facingMode: 'user'
+                } 
+              });
+            } catch (secondErr: any) {
+              console.warn("User facing camera failed, trying any video device:", secondErr);
+              stream = await navigator.mediaDevices.getUserMedia({ 
+                video: true 
+              });
+            }
+          }
           streamRef.current = stream;
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
@@ -892,7 +913,7 @@ export default function App() {
         } catch (camErr: any) {
           console.error("Camera error:", camErr);
           setStatus('Camera Error');
-          setErrorMsg('Camera access denied. Please allow camera access in your browser settings, then refresh the browser page.');
+          setErrorMsg(`Camera error: ${camErr.message || camErr}. Please ensure a camera is connected, allowed in browser settings, and not in use by another app.`);
           return;
         }
       }
